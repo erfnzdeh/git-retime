@@ -1,0 +1,6 @@
+git-retime
+dist/
+*.exe
+*.test
+*.out
+.git-retime-todo
