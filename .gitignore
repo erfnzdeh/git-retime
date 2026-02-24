@@ -4,3 +4,4 @@ dist/
 *.test
 *.out
 .git-retime-todo
+.cursor/
