@@ -97,12 +97,12 @@ To abort a retime session, either:
 
 ```mermaid
 flowchart LR
-    A([git retime HEAD~5]) --> B[git log\nfetch commits]
-    B --> C[generate\n.git-retime-todo]
-    C --> D[$GIT_EDITOR\nopens]
-    D --> E[parse edits\ncompute deltas]
-    E --> F[compile\nrebase todo]
-    F --> G[headless\ngit rebase -i]
+    A([git retime HEAD~5]) --> B["git log"]
+    B --> C["generate .git-retime-todo"]
+    C --> D["$GIT_EDITOR opens"]
+    D --> E["parse edits & compute deltas"]
+    E --> F["compile rebase todo"]
+    F --> G["headless git rebase -i"]
     G --> H([done])
 ```
 
