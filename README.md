@@ -27,10 +27,8 @@ go install github.com/erfnzdeh/git-retime@latest
 ## Usage
 
 ```bash
-git retime HEAD~5           # Open editor for the last 5 commits
-git retime abc1234          # Retime from abc1234 to HEAD
-git retime HEAD~3 --shift +2h          # Shift last 3 commits by 2 hours
-git retime HEAD~5 --randomize 09:00-17:00  # Randomize times within working hours
+git retime HEAD~5   # Open editor for the last 5 commits
+git retime abc1234  # Retime from abc1234 to HEAD
 ```
 
 Running `git retime HEAD~5` opens your editor with a file like this:
@@ -75,10 +73,17 @@ Proceed anyway? [y/N]
 
 ## Flags
 
+The `--shift` and `--randomize` flags let you retime commits non-interactively — no editor is opened, the change is applied immediately:
+
+```bash
+git retime HEAD~3 --shift +2h                  # Shift last 3 commits by 2 hours
+git retime HEAD~5 --randomize 09:00-17:00      # Randomize time-of-day within working hours
+```
+
 | Flag | Description |
 |------|-------------|
-| `--shift +2h` | Non-interactive: shift all commits by an offset |
-| `--randomize 09:00-17:00` | Non-interactive: randomize time-of-day within a range |
+| `--shift +2h` | Shift all commits by an offset |
+| `--randomize 09:00-17:00` | Randomize time-of-day within a range |
 | `--split-dates` | Edit author and committer dates independently (two timestamp columns) |
 | `-i` | Accepted for compatibility (interactive is the default) |
 
