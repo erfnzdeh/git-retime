@@ -45,25 +45,19 @@ c5d6e7f  2026-02-23 11:00:00  Add API endpoints
 e5f6a7b  2026-02-23 12:15:00  Update README
 ```
 
-Edit the middle column, save, and the timestamps are rewritten.
+Edit the middle column, save, and the timestamps are rewritten. For example:
 
-## Syntax Reference
+```
+# Retime 5 commits onto abc1234
+#
+a1b2c3d  2026-02-23 14:00:00       Fix navbar          # absolute: exact time
+f012345  2026-02-23 10:30:00 +2h   Create user models  # shift from the written time
+c5d6e7f  +1h30m                    Add API endpoints   # bare shift from the original time
+8901abc  PREV +45m                 Write tests         # previous commit's original time + offset
+e5f6a7b  RR(09,17):RR:00          Update README       # random hour in 9-17, random minute
+```
 
-| Syntax | Example | Meaning |
-|--------|---------|---------|
-| Absolute | `2026-02-23 14:00:00` | Set an exact time |
-| Shift | `2026-02-23 10:00:00 +2h` | Shift from the written time |
-| Bare shift | `+2h` or `-30m` | Shift from the original time |
-| Compound | `+1d2h30m` | 1 day, 2 hours, 30 minutes |
-| `PREV` | `PREV` | Same as previous commit's original time |
-| `PREV` + offset | `PREV +45m` | Previous original time + 45 minutes |
-| `NOW` | `NOW` | Current wall-clock time |
-| `RR` | `RR:RR:00` | Random hour (0-23), random minute (0-59) |
-| `RR(min,max)` | `RR(09,17):RR:00` | Random hour in 9-17, random minute |
-
-**Units:** `w` (weeks), `d` (days), `h` (hours), `m` (minutes), `s` (seconds)
-
-**RR** only works on time fields (HH:MM:SS), not date fields.
+Other supported values: `NOW` (current wall-clock time), `PREV` (previous commit's original time with no offset), `RR:RR:00` (random hour 0-23, random minute 0-59). `RR` accepts an optional range — `RR(09,17)` restricts the random value to between 9 and 17. Units: `w` weeks, `d` days, `h` hours, `m` minutes, `s` seconds. `RR` only works in time fields, not date fields.
 
 ## Editing Commit Messages
 
