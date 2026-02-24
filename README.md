@@ -95,22 +95,44 @@ To abort a retime session, either:
 
 ## How It Works
 
+```mermaid
+flowchart LR
+    A([git retime HEAD~5]) --> B[git log\nfetch commits]
+    B --> C[generate\n.git-retime-todo]
+    C --> D[$GIT_EDITOR\nopens]
+    D --> E[parse edits\ncompute deltas]
+    E --> F[compile\nrebase todo]
+    F --> G[headless\ngit rebase -i]
+    G --> H([done])
+```
+
 1. Fetches commits via `git log`
 2. Generates a `.git-retime-todo` file with timestamps in your local timezone
 3. Opens your `$GIT_EDITOR`
-4. Parses edits, computes deltas, and applies them to the original timestamps (preserving the original timezone offset)
+4. Parses edits, computes deltas, and applies them to the original timestamps
 5. Compiles a `git rebase -i` todo with `pick` + `exec` lines that amend each commit's dates
 6. Executes a headless rebase via `GIT_SEQUENCE_EDITOR`
 
-If the rebase fails, `git-retime` automatically runs `git rebase --abort` to restore your repository.
+The headless rebase works by setting `GIT_SEQUENCE_EDITOR` to a `cp` command that replaces Git's auto-generated todo with the pre-compiled one:
 
-## Design Decisions
+```bash
+GIT_SEQUENCE_EDITOR="cp /path/to/compiled-todo" git rebase -i --rebase-merges <base>
+```
+
+The compiled todo contains `pick` + `exec` pairs. The `exec` line uses `--date` to set the author date and `GIT_COMMITTER_DATE` for the committer date:
+
+```
+pick a1b2c3d Fix navbar
+exec GIT_COMMITTER_DATE="2026-02-23T10:00:00+0500" git commit --amend --no-edit --allow-empty --date="2026-02-23T10:00:00+0500"
+```
+
+If the commit message was edited, `--no-edit` is replaced with `-m 'New subject'` and the original body is preserved. If the rebase fails for any reason, `git-retime` automatically runs `git rebase --abort` to restore your repository.
 
 ### Timezone Strategy
 
 Timestamps are displayed in your local timezone without showing the offset. Edits are computed as deltas from the displayed time, then applied to the original timestamp in its original timezone. This means you see and edit in local time, but the original timezone offset is preserved in the final commit.
 
-For example, if a commit was authored at `10:00 +0530` (India) and your machine is in `UTC-0800` (LA), you see it as `20:30` in the editor. If you change it to `22:30`, the tool computes a +2h delta and applies it to the original, producing `12:00 +0530` -- the offset stays intact.
+For example, if a commit was authored at `10:00 +0530` (India) and your machine is in `UTC-0800` (LA), you see it as `20:30` in the editor. If you change it to `22:30`, the tool computes a +2h delta and applies it to the original, producing `12:00 +0530` — the offset stays intact.
 
 ### Author Date vs. Committer Date
 
@@ -124,13 +146,9 @@ Both are set identically by default. The `--split-dates` flag adds a second time
 
 All commits using `NOW` receive the exact same timestamp (captured once at execution start). There are no micro-offsets or ordering tricks.
 
-### Timestamps Only -- No History Mutation
+### Scope Is Strictly Timestamps and Messages
 
-You cannot delete or reorder lines. `git-retime` strictly modifies timestamps and commit messages. If lines are missing or reordered, the tool refuses and tells you why. This keeps the scope tight and prevents accidental history destruction.
-
-### Paradox Handling
-
-Time paradoxes (a child commit older than its parent) are warned about in the terminal with a y/n prompt. Answering "no" reopens the editor so you can fix it. Answering "yes" proceeds -- Git itself allows paradoxical timestamps, so the tool doesn't block intentional ones.
+You cannot delete or reorder lines. If lines are missing or reordered, the tool refuses and tells you why. This keeps the scope tight and prevents accidental history destruction.
 
 ### Merge Topology
 
@@ -140,14 +158,6 @@ Rebase uses `--rebase-merges` to preserve merge commit structure. Standard `git 
 
 When the target revision is the root commit (no parent), the tool automatically uses `--root` so the entire history including the first commit can be retimed.
 
-### Rebase Failure Recovery
-
-If the underlying `git rebase` fails for any reason (hook rejection, disk error, etc.), `git-retime` automatically runs `git rebase --abort` and surfaces the error. Your repository is restored to its pre-retime state.
-
-### Dirty Worktree
-
-Handled the same way as `git rebase`: if your working tree has uncommitted changes, the operation is refused before anything happens.
-
 ### Editor Resolution
 
 Resolved via `git var GIT_EDITOR`, which follows Git's own precedence chain: `GIT_EDITOR` env var, then `core.editor` config, then `VISUAL`, then `EDITOR`, then `vi`.
@@ -155,35 +165,6 @@ Resolved via `git var GIT_EDITOR`, which follows Git's own precedence chain: `GI
 ### Revision Input
 
 Accepts anything `git rev-parse` understands: `HEAD~5`, commit hashes, branch names, tags, `@{upstream}`, etc.
-
-### Output Philosophy
-
-Plain text, no ANSI colors. Silent on success (Unix philosophy).
-
-## Rebase Mechanics
-
-The headless rebase works by setting `GIT_SEQUENCE_EDITOR` to a `cp` command that replaces Git's auto-generated todo with the pre-compiled one:
-
-```bash
-GIT_SEQUENCE_EDITOR="cp /path/to/compiled-todo" git rebase -i --rebase-merges <base>
-```
-
-The compiled todo contains `pick` + `exec` pairs. The `exec` line uses `--date` to set the author date and the `GIT_COMMITTER_DATE` env var for the committer date:
-
-```
-pick a1b2c3d Fix navbar
-exec GIT_COMMITTER_DATE="2026-02-23T10:00:00+0500" git commit --amend --no-edit --allow-empty --date="2026-02-23T10:00:00+0500"
-```
-
-If the commit message was edited, `--no-edit` is replaced with `-m 'New subject'` and the original body is preserved.
-
-## Constraints
-
-- You cannot delete or reorder lines (only timestamps and messages are editable)
-- `RR` is only supported in time fields, not date fields
-- `PREV` refers to the **original** timestamp of the previous commit, not its edited value
-- Merge topology is preserved via `--rebase-merges`
-- Root commits are supported (uses `--root` internally)
 
 ## License
 
