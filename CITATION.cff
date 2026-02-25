@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: git-retime
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - name: erfnzdeh
+url: https://github.com/erfnzdeh/git-retime
+repository-code: https://github.com/erfnzdeh/git-retime
+license: GPL-3.0
+version: 0.0.0
+date-released: 2026-02-25
+keywords:
+  - git
+  - commit
+  - timestamp
+  - rebase
+  - history
+abstract: >-
+  The missing interactive time editor for Git. Edit commit timestamps
+  using a clean, data-centric interface via a structured todo file
+  and headless git rebase -i.

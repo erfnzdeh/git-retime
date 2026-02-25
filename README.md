@@ -166,6 +166,13 @@ Resolved via `git var GIT_EDITOR`, which follows Git's own precedence chain: `GI
 
 Accepts anything `git rev-parse` understands: `HEAD~5`, commit hashes, branch names, tags, `@{upstream}`, etc.
 
+## Community
+
+- [Contributing](CONTRIBUTING.md) — How to contribute
+- [Code of Conduct](CODE_OF_CONDUCT.md) — Community standards
+- [Support](SUPPORT.md) — Where to get help
+- [Security](.github/SECURITY.md) — Reporting vulnerabilities
+
 ## License
 
-MIT
+GPL-3.0 — see [LICENSE](LICENSE) for details.
