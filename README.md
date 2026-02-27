@@ -65,7 +65,9 @@ The last column is the commit message subject. Editing it will rewrite the commi
 
 ## Time Paradox Detection
 
-If an edited timestamp creates a child commit older than its parent, `git-retime` warns you and asks whether to proceed:
+If an edited timestamp creates a child commit older than its parent, `git-retime` warns you and asks whether to proceed.
+
+When using `--randomize`, times are automatically sorted within each day so commits on the same date stay in order. Commits on different dates are not compared — a later commit on an earlier date is intentional and allowed. Pass `--randomize-allow-paradox` to disable this sorting and let each commit get a fully independent random time.
 
 ```
 warning: time paradox detected
@@ -86,6 +88,7 @@ git retime HEAD~5 --randomize 09:00-17:00      # Randomize time-of-day within wo
 |------|-------------|
 | `--shift +2h` | Shift all commits by an offset |
 | `--randomize 09:00-17:00` | Randomize time-of-day within a range |
+| `--randomize-allow-paradox` | Skip monotonic ordering within each day when randomizing |
 | `--split-dates` | Edit author and committer dates independently (two timestamp columns) |
 | `-i` | Accepted for compatibility (interactive is the default) |
 

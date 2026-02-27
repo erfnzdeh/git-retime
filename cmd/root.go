@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,10 +19,11 @@ import (
 )
 
 type options struct {
-	shift      string
-	randomize  string
-	splitDates bool
-	interactive bool // no-op, accepted for UX compatibility
+	shift                 string
+	randomize             string
+	randomizeAllowParadox bool
+	splitDates            bool
+	interactive           bool // no-op, accepted for UX compatibility
 }
 
 func Run(args []string) error {
@@ -34,6 +36,7 @@ func Run(args []string) error {
 
 	fs.StringVar(&opts.shift, "shift", "", "shift all commits by offset (e.g. +2h, -1d30m)")
 	fs.StringVar(&opts.randomize, "randomize", "", "randomize time-of-day within range (e.g. 09:00-17:00)")
+	fs.BoolVar(&opts.randomizeAllowParadox, "randomize-allow-paradox", false, "allow non-monotonic times when randomizing (by default times are sorted within each day)")
 	fs.BoolVar(&opts.splitDates, "split-dates", false, "edit author and committer dates independently")
 	fs.BoolVar(&opts.interactive, "i", false, "interactive mode (default, accepted for compatibility)")
 
@@ -78,7 +81,7 @@ func Run(args []string) error {
 		return runShift(commits, base, needsRoot, opts.shift, opts.splitDates, now)
 	}
 	if opts.randomize != "" {
-		return runRandomize(commits, base, needsRoot, opts.randomize, opts.splitDates, now)
+		return runRandomize(commits, base, needsRoot, opts.randomize, opts.splitDates, opts.randomizeAllowParadox, now)
 	}
 
 	return runInteractive(commits, base, needsRoot, opts.splitDates, now)
@@ -180,7 +183,7 @@ func runShift(commits []git.CommitInfo, base string, needsRoot bool, shiftExpr s
 	return executeRebase(tsCommits, base, needsRoot)
 }
 
-func runRandomize(commits []git.CommitInfo, base string, needsRoot bool, rangeExpr string, splitDates bool, now time.Time) error {
+func runRandomize(commits []git.CommitInfo, base string, needsRoot bool, rangeExpr string, splitDates, allowParadox bool, now time.Time) error {
 	parts := strings.SplitN(rangeExpr, "-", 2)
 	if len(parts) != 2 {
 		return fmt.Errorf("invalid --randomize range: expected HH:MM-HH:MM, got %q", rangeExpr)
@@ -199,9 +202,17 @@ func runRandomize(commits []git.CommitInfo, base string, needsRoot bool, rangeEx
 		return fmt.Errorf("randomize end time must be after start time")
 	}
 
+	times := make([]time.Time, len(commits))
+	for i, c := range commits {
+		times[i] = randomizeTime(c.AuthorDate, startTime, endTime)
+	}
+
+	if !allowParadox {
+		sortTimesWithinDays(commits, times)
+	}
+
 	tsCommits := make([]timestamp.Commit, len(commits))
 	for i, c := range commits {
-		randomized := randomizeTime(c.AuthorDate, startTime, endTime)
 		tsCommits[i] = timestamp.Commit{
 			Hash:               c.Hash,
 			OrigAuthorDate:     c.AuthorDate,
@@ -209,12 +220,47 @@ func runRandomize(commits []git.CommitInfo, base string, needsRoot bool, rangeEx
 			Subject:            c.Subject,
 			Body:               c.Body,
 			NewSubject:         c.Subject,
-			ResolvedAuthorDate: randomized,
-			ResolvedCommitDate: randomized,
+			ResolvedAuthorDate: times[i],
+			ResolvedCommitDate: times[i],
 		}
 	}
 
 	return executeRebase(tsCommits, base, needsRoot)
+}
+
+// sortTimesWithinDays sorts the randomized times in-place, but only within
+// commits that share the same calendar date. Commits on different dates are
+// left independent — a later commit on an earlier date is fine by design.
+func sortTimesWithinDays(commits []git.CommitInfo, times []time.Time) {
+	type dateKey struct {
+		y int
+		m time.Month
+		d int
+	}
+
+	// Collect indices per date, preserving commit order within each group.
+	groups := make(map[dateKey][]int)
+	for i, c := range commits {
+		y, m, d := c.AuthorDate.Date()
+		k := dateKey{y, m, d}
+		groups[k] = append(groups[k], i)
+	}
+
+	for _, indices := range groups {
+		// Extract times for this date group.
+		groupTimes := make([]time.Time, len(indices))
+		for j, idx := range indices {
+			groupTimes[j] = times[idx]
+		}
+		// Sort ascending.
+		sort.Slice(groupTimes, func(a, b int) bool {
+			return groupTimes[a].Before(groupTimes[b])
+		})
+		// Write back in the same positional order (indices are already ascending).
+		for j, idx := range indices {
+			times[idx] = groupTimes[j]
+		}
+	}
 }
 
 func executeRebase(tsCommits []timestamp.Commit, base string, needsRoot bool) error {
