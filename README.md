@@ -50,12 +50,12 @@ Edit the middle column, save, and the timestamps are rewritten. For example:
 #
 a1b2c3d  2026-02-23 14:00:00       Fix navbar          # absolute: exact time
 f012345  2026-02-23 10:30:00 +2h   Create user models  # shift from the written time
-c5d6e7f  +1h30m                    Add API endpoints   # bare shift from the original time
-8901abc  PREV +45m                 Write tests         # previous commit's original time + offset
+c5d6e7f  +1h30m                    Add API endpoints   # previous commit's new time + 1h30m
+8901abc  +45m                      Write tests         # previous commit's new time + 45m
 e5f6a7b  RR(09,17):RR:00          Update README       # random hour in 9-17, random minute
 ```
 
-Other supported values: `NOW` (current wall-clock time), `PREV` (previous commit's original time with no offset), `RR:RR:00` (random hour 0-23, random minute 0-59). `RR` accepts an optional range — `RR(09,17)` restricts the random value to between 9 and 17. Units: `w` weeks, `d` days, `h` hours, `m` minutes, `s` seconds. `RR` only works in time fields, not date fields.
+Other supported values: `NOW` (current wall-clock time), `RR:RR:00` (random hour 0-23, random minute 0-59). `RR` accepts an optional range — `RR(09,17)` restricts the random value to between 9 and 17. Units: `w` weeks, `d` days, `h` hours, `m` minutes, `s` seconds. `RR` only works in time fields, not date fields.
 
 > **Columns are separated by two or more spaces.** A trailing shift like `+3d` is part of the timestamp column, so there must be at least two spaces between it and the commit message. Writing `2026-02-17 03:55:33 +3d  My message` (two spaces before the message) is correct; a single space will cause a parse error.
 
@@ -143,9 +143,11 @@ For example, if a commit was authored at `10:00 +0530` (India) and your machine 
 
 Both are set identically by default. The `--split-dates` flag adds a second timestamp column so you can control them independently.
 
-### PREV Is Non-Cascading
+### Bare Shifts Are Cascading
 
-`PREV` resolves to the **original** timestamp of the line above, not the edited/resolved value. This makes behavior predictable and avoids cascading surprises where one edit shifts all subsequent PREV references.
+A bare shift like `+1h` resolves relative to the **previous commit's new (resolved) time**, not the original. This means shifts chain naturally: if commit A is moved to 10:00 and commit B has `+30m`, B lands at 10:30 — and if C has `+15m`, C lands at 10:45 — regardless of where A, B, or C originally were.
+
+A bare shift on the **first commit** is an error; use an absolute timestamp instead.
 
 ### NOW Is Exact
 

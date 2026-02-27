@@ -30,18 +30,26 @@ type Commit struct {
 // timestamps. The commits slice must be in oldest-first order.
 //
 // The now parameter is captured once and used for all NOW references.
+// Bare shift expressions (e.g. "+1h30m") resolve relative to the previous
+// commit's already-resolved author date, so they chain naturally.
 func ResolveAll(commits []Commit, now time.Time, splitDates bool) error {
 	for i := range commits {
 		c := &commits[i]
 
-		resolved, err := resolveOne(c.EditedRaw, c.OrigAuthorDate, getPrevOriginal(commits, i), now)
+		var prevResolved *time.Time
+		if i > 0 {
+			t := commits[i-1].ResolvedAuthorDate
+			prevResolved = &t
+		}
+
+		resolved, err := resolveOne(c.EditedRaw, c.OrigAuthorDate, prevResolved, now)
 		if err != nil {
 			return fmt.Errorf("commit %s: author date: %w", c.Hash, err)
 		}
 		c.ResolvedAuthorDate = resolved
 
 		if splitDates {
-			resolved2, err := resolveOne(c.EditedRaw2, c.OrigCommitDate, getPrevOriginal(commits, i), now)
+			resolved2, err := resolveOne(c.EditedRaw2, c.OrigCommitDate, prevResolved, now)
 			if err != nil {
 				return fmt.Errorf("commit %s: committer date: %w", c.Hash, err)
 			}
@@ -53,15 +61,7 @@ func ResolveAll(commits []Commit, now time.Time, splitDates bool) error {
 	return nil
 }
 
-func getPrevOriginal(commits []Commit, i int) *time.Time {
-	if i == 0 {
-		return nil
-	}
-	t := commits[i-1].OrigAuthorDate
-	return &t
-}
-
-func resolveOne(raw string, original time.Time, prevOriginal *time.Time, now time.Time) (time.Time, error) {
+func resolveOne(raw string, original time.Time, prevResolved *time.Time, now time.Time) (time.Time, error) {
 	raw = strings.TrimSpace(raw)
 
 	if raw == "" {
@@ -72,36 +72,10 @@ func resolveOne(raw string, original time.Time, prevOriginal *time.Time, now tim
 		return now, nil
 	}
 
-	if strings.HasPrefix(strings.ToUpper(raw), "PREV") {
-		return resolvePrev(raw, prevOriginal)
-	}
-
-	return resolveAbsoluteOrShift(raw, original)
+	return resolveAbsoluteOrShift(raw, original, prevResolved)
 }
 
-func resolvePrev(raw string, prevOriginal *time.Time) (time.Time, error) {
-	if prevOriginal == nil {
-		return time.Time{}, fmt.Errorf("PREV used on first commit (no previous commit)")
-	}
-
-	rest := strings.TrimSpace(raw[4:])
-	if rest == "" {
-		return *prevOriginal, nil
-	}
-
-	if !ContainsShift(rest) {
-		return time.Time{}, fmt.Errorf("invalid expression after PREV: %q", rest)
-	}
-
-	shift, err := ParseShift(rest)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("PREV shift: %w", err)
-	}
-
-	return prevOriginal.Add(shift), nil
-}
-
-func resolveAbsoluteOrShift(raw string, original time.Time) (time.Time, error) {
+func resolveAbsoluteOrShift(raw string, original time.Time, prevResolved *time.Time) (time.Time, error) {
 	displayedOriginal := FormatLocal(original)
 
 	// Check if the timestamp contains RR tokens — resolve them first.
@@ -118,12 +92,15 @@ func resolveAbsoluteOrShift(raw string, original time.Time) (time.Time, error) {
 	tsStr = strings.TrimSpace(tsStr)
 
 	if tsStr == "" && shiftExpr != "" {
-		// Bare shift like "+2h" — apply to original.
+		// Bare shift like "+1h30m" — apply to the previous commit's resolved time.
+		if prevResolved == nil {
+			return time.Time{}, fmt.Errorf("bare shift on the first commit: no previous commit to shift from")
+		}
 		shift, err := ParseShift(shiftExpr)
 		if err != nil {
 			return time.Time{}, err
 		}
-		return original.Add(shift), nil
+		return prevResolved.Add(shift), nil
 	}
 
 	parsedLocal, err := ParseLocal(tsStr)
