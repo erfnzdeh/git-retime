@@ -57,6 +57,8 @@ e5f6a7b  RR(09,17):RR:00          Update README       # random hour in 9-17, ran
 
 Other supported values: `NOW` (current wall-clock time), `PREV` (previous commit's original time with no offset), `RR:RR:00` (random hour 0-23, random minute 0-59). `RR` accepts an optional range — `RR(09,17)` restricts the random value to between 9 and 17. Units: `w` weeks, `d` days, `h` hours, `m` minutes, `s` seconds. `RR` only works in time fields, not date fields.
 
+> **Columns are separated by two or more spaces.** A trailing shift like `+3d` is part of the timestamp column, so there must be at least two spaces between it and the commit message. Writing `2026-02-17 03:55:33 +3d  My message` (two spaces before the message) is correct; a single space will cause a parse error.
+
 ## Editing Commit Messages
 
 The last column is the commit message subject. Editing it will rewrite the commit message (the body is preserved).
